@@ -18,6 +18,28 @@ function App() {
   const [maxInstances] = useState(4);
   const [apiKey, setApiKey] = useState('');
 
+  const fetchModels = useCallback(async () => {
+    if (!apiKey) {
+      setError('API key required to fetch models');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const fetchedModels = await openRouterApi.getModels();
+      const freeModels = fetchedModels.filter(model => 
+        model.pricing?.prompt === 0 || model.pricing?.prompt === '0'
+      );
+      setModels(freeModels);
+    } catch (err) {
+      setError(`Failed to fetch models: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [apiKey]);
+
   // Load settings and API key on startup
   useEffect(() => {
     const savedApiKey = storageService.getApiKey();
@@ -33,36 +55,16 @@ function App() {
       ttsService.setVoice(savedSettings.selectedVoice);
     }
     
-    // Auto-fetch models if API key is available
-    if (savedApiKey) {
-      fetchModels();
-    }
-    
     // Initialize TTS service
     ttsService.initialize();
   }, []);
 
-  const fetchModels = useCallback(async () => {
-    if (!apiKey) {
-      setError('API key required to fetch models');
-      return;
+  // Auto-fetch models when API key changes
+  useEffect(() => {
+    if (apiKey) {
+      fetchModels();
     }
-
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const fetchedModels = await openRouterApi.getModels();
-      const freeModels = fetchedModels.filter(model => 
-        model.pricing?.prompt === 0 || model.pricing?.prompt === '0'
-      );
-      setModels(freeModels);
-    } catch (err) {
-      setError(`Failed to fetch models: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [apiKey]);
+  }, [apiKey, fetchModels]);
 
   const addInstance = () => {
     if (instances.length < maxInstances) {
@@ -151,11 +153,6 @@ function App() {
       setApiKey(settings.apiKey);
       openRouterApi.setApiKey(settings.apiKey);
       storageService.setApiKey(settings.apiKey);
-      
-      // Fetch models with new API key
-      if (settings.apiKey) {
-        fetchModels();
-      }
     }
     
     setAutoChatDelay(settings.autoChatDelay);
@@ -172,7 +169,7 @@ function App() {
       case 1: return 'grid-cols-1';
       case 2: return 'grid-cols-1 lg:grid-cols-2';
       case 3: return 'grid-cols-1 lg:grid-cols-3';
-      default: return 'grid-cols-1 lg:grid-cols-2xl:grid-cols-2';
+      default: return 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-2';
     }
   };
 
